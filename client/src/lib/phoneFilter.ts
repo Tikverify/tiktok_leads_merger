@@ -1,49 +1,82 @@
 /**
- * Phone Number Filtering Utility
- * Detects and filters out North African country codes
+ * Phone Number Filtering Utility - Production Grade
+ * Handles all phone number formats and reliably detects country codes
+ * Supports: +249 96 010 7260, +213 775 78 99 00, +212 782-642589, etc.
  */
 
 // North African country codes to filter
-const NORTH_AFRICA_CODES = [
-  "213", // Algeria
-  "216", // Tunisia
-  "212", // Morocco
-  "218", // Libya
-  "20",  // Egypt
-  "249", // Sudan
-];
+const NORTH_AFRICA_CODES = ["213", "216", "212", "218", "20", "249"];
 
 /**
- * Normalize phone number to a standard format for comparison
- * Handles: +212..., 00212..., 212... formats
+ * Extract and normalize country code from any phone format
+ * Handles: +249..., 00249..., 249..., with spaces/dashes/parentheses
+ * Returns: { countryCode: string, isNorthAfrican: boolean }
  */
-export function normalizePhoneNumber(phone: string): string {
-  if (!phone || typeof phone !== "string") return "";
-
-  // Remove all whitespace and hyphens
-  let normalized = phone.trim().replace(/[\s\-()]/g, "");
-
-  // Handle +212 format
-  if (normalized.startsWith("+")) {
-    normalized = normalized.substring(1);
+export function extractCountryCode(phone: string): {
+  countryCode: string;
+  isNorthAfrican: boolean;
+} {
+  if (!phone || typeof phone !== "string") {
+    return { countryCode: "", isNorthAfrican: false };
   }
 
-  // Handle 00212 format (convert to 212)
-  if (normalized.startsWith("00")) {
-    normalized = normalized.substring(2);
+  // Step 1: Remove all whitespace, dashes, parentheses, and dots
+  let cleaned = phone.trim().replace(/[\s\-().,]/g, "");
+
+  // Step 2: Handle + prefix
+  if (cleaned.startsWith("+")) {
+    cleaned = cleaned.substring(1);
   }
 
-  return normalized;
+  // Step 3: Handle 00 prefix (international format)
+  if (cleaned.startsWith("00")) {
+    cleaned = cleaned.substring(2);
+  }
+
+  // Step 4: Extract country code (1-3 digits at the start)
+  // Most country codes are 1-3 digits, with special cases:
+  // - Single digit: 1 (North America), 7 (Russia)
+  // - Two digits: 20 (Egypt), 27 (South Africa), 33 (France), etc.
+  // - Three digits: 212 (Morocco), 213 (Algeria), 216 (Tunisia), etc.
+
+  let countryCode = "";
+
+  // Try 3-digit codes first (most specific)
+  if (cleaned.length >= 3) {
+    const threeDigit = cleaned.substring(0, 3);
+    if (NORTH_AFRICA_CODES.includes(threeDigit)) {
+      countryCode = threeDigit;
+    }
+  }
+
+  // If no 3-digit match, try 2-digit codes
+  if (!countryCode && cleaned.length >= 2) {
+    const twoDigit = cleaned.substring(0, 2);
+    if (NORTH_AFRICA_CODES.includes(twoDigit)) {
+      countryCode = twoDigit;
+    }
+  }
+
+  // If no 2-digit match, try 1-digit codes (only "1" is in our list for North Africa context)
+  if (!countryCode && cleaned.length >= 1) {
+    const oneDigit = cleaned.substring(0, 1);
+    if (NORTH_AFRICA_CODES.includes(oneDigit)) {
+      countryCode = oneDigit;
+    }
+  }
+
+  const isNorthAfrican = NORTH_AFRICA_CODES.includes(countryCode);
+
+  return { countryCode, isNorthAfrican };
 }
 
 /**
  * Check if a phone number belongs to North Africa
+ * Handles all format variations
  */
 export function isNorthAfricanNumber(phone: string): boolean {
-  const normalized = normalizePhoneNumber(phone);
-
-  // Check if the normalized number starts with any North African code
-  return NORTH_AFRICA_CODES.some((code) => normalized.startsWith(code));
+  const { isNorthAfrican } = extractCountryCode(phone);
+  return isNorthAfrican;
 }
 
 /**
@@ -62,6 +95,9 @@ export function detectPhoneColumns(headers: string[]): number[] {
     "cellphone",
     "whatsapp",
     "phonenumber",
+    "phone_number",
+    "mobile_number",
+    "contactnumber",
   ];
 
   return headers

@@ -5,7 +5,7 @@ import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Trash2, Filter } fr
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { filterNorthAfricanLeads, detectPhoneColumns } from "@/lib/phoneFilter";
+import { filterNorthAfricanLeads, detectPhoneColumns, extractCountryCode } from "@/lib/phoneFilter";
 
 interface FileData {
   id: string;
@@ -201,20 +201,9 @@ export default function Home() {
           const phoneColumn = file.headers[colIndex];
           file.data.forEach((row) => {
             const phone = row[phoneColumn];
-            if (phone && typeof phone === "string") {
-              const normalized = phone
-                .trim()
-                .replace(/[\s\-()]/g, "")
-                .replace(/^\+/, "")
-                .replace(/^00/, "");
-              if (
-                normalized.startsWith("213") ||
-                normalized.startsWith("216") ||
-                normalized.startsWith("212") ||
-                normalized.startsWith("218") ||
-                normalized.startsWith("20") ||
-                normalized.startsWith("249")
-              ) {
+            if (phone) {
+              const { isNorthAfrican } = extractCountryCode(String(phone));
+              if (isNorthAfrican) {
                 estimatedFiltered++;
               }
             }
