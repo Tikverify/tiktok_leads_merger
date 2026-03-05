@@ -5,7 +5,7 @@ import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Trash2, Filter } fr
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { filterNorthAfricanLeads, detectPhoneColumns, extractCountryCode } from "@/lib/phoneFilter";
+import { filterAfricanLeads, detectPhoneColumns, extractCountryCode } from "@/lib/phoneFilter";
 
 interface FileData {
   id: string;
@@ -126,13 +126,13 @@ export default function Home() {
 
         if (enableFiltering) {
           // Apply filtering to each file before merging
-          const { filteredData, removedCount, phoneColumnsUsed } = filterNorthAfricanLeads(
+          const { filteredData, removedCount, phoneColumnsUsed } = filterAfricanLeads(
             file.data,
             file.headers
           );
           mergedData = mergedData.concat(filteredData);
           totalFiltered += removedCount;
-          phoneColumnsUsed.forEach((col) => phoneColumnsDetected.add(col));
+          phoneColumnsUsed.forEach((col: string) => phoneColumnsDetected.add(col));
         } else {
           mergedData = mergedData.concat(file.data);
         }
@@ -169,7 +169,7 @@ export default function Home() {
 
       if (enableFiltering && totalFiltered > 0) {
         toast.success(
-          `Merged ${files.length} files: ${finalLeadCount} leads kept (${totalFiltered} North African numbers removed)`
+          `Merged ${files.length} files: ${finalLeadCount} leads kept (${totalFiltered} African numbers removed)`
         );
       } else {
         toast.success(`Successfully merged ${files.length} files with ${finalLeadCount} total leads`);
@@ -202,8 +202,8 @@ export default function Home() {
           file.data.forEach((row) => {
             const phone = row[phoneColumn];
             if (phone) {
-              const { isNorthAfrican } = extractCountryCode(String(phone));
-              if (isNorthAfrican) {
+              const { isAfrican } = extractCountryCode(String(phone));
+              if (isAfrican) {
                 estimatedFiltered++;
               }
             }
@@ -225,7 +225,7 @@ export default function Home() {
             <div>
               <h1 className="text-2xl font-bold text-foreground">TikTok Leads Merger</h1>
               <p className="text-sm text-muted-foreground">
-                Combine and filter multiple lead exports into one file
+                Combine and filter African leads from your exports
               </p>
             </div>
           </div>
@@ -370,11 +370,11 @@ export default function Home() {
                           onChange={(e) => setEnableFiltering(e.target.checked)}
                           className="w-4 h-4 rounded"
                         />
-                        Remove North African Numbers
+                        Remove African Numbers (+2xx)
                       </label>
                     </div>
                     <p className="text-xs text-blue-700">
-                      Automatically removes leads with +213, +216, +212, +218, +20, +249
+                      Automatically removes all leads with +2xx country codes (Africa)
                     </p>
                   </div>
 
