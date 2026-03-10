@@ -6,6 +6,7 @@ import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { filterAfricanLeads, detectPhoneColumns, extractCountryCode } from "@/lib/phoneFilter";
+import { removeDuplicateLeads, hasIdentifyingColumns } from "@/lib/deduplication";
 
 interface FileData {
   id: string;
@@ -23,6 +24,7 @@ export default function Home() {
   const [isMerging, setIsMerging] = useState(false);
   const [mergeProgress, setMergeProgress] = useState(0);
   const [enableFiltering, setEnableFiltering] = useState(true);
+  const [enableDeduplication, setEnableDeduplication] = useState(true);
   const [filterStats, setFilterStats] = useState<{
     totalRemoved: number;
     phoneColumnsDetected: string[];
@@ -148,6 +150,22 @@ export default function Home() {
         });
       }
 
+      // Apply deduplication if enabled
+      let totalDuplicatesRemoved = 0;
+      if (enableDeduplication && mergedData.length > 0) {
+        const allHeadersArray = Array.from(allHeaders);
+        if (hasIdentifyingColumns(allHeadersArray)) {
+          const { deduplicatedData, removedCount } = removeDuplicateLeads(
+            mergedData,
+            allHeadersArray
+          );
+          mergedData = deduplicatedData;
+          totalDuplicatesRemoved = removedCount;
+        }
+      }
+
+      setMergeProgress(65);
+
       // Create workbook
       const ws = XLSX.utils.json_to_sheet(mergedData);
       const wb = XLSX.utils.book_new();
@@ -167,13 +185,20 @@ export default function Home() {
       const finalLeadCount = mergedData.length;
       const originalLeadCount = files.reduce((sum, f) => sum + f.rows, 0);
 
+      let successMessage = `Merged ${files.length} files: ${finalLeadCount} leads kept`;
+      const removedReasons: string[] = [];
       if (enableFiltering && totalFiltered > 0) {
-        toast.success(
-          `Merged ${files.length} files: ${finalLeadCount} leads kept (${totalFiltered} African numbers removed)`
-        );
-      } else {
-        toast.success(`Successfully merged ${files.length} files with ${finalLeadCount} total leads`);
+        removedReasons.push(`${totalFiltered} African numbers`);
       }
+      if (enableDeduplication && totalDuplicatesRemoved > 0) {
+        removedReasons.push(`${totalDuplicatesRemoved} duplicates`);
+      }
+
+      if (removedReasons.length > 0) {
+        successMessage += ` (removed: ${removedReasons.join(", ")})`;
+      }
+
+      toast.success(successMessage);
 
       // Reset after a brief delay
       setTimeout(() => {
@@ -375,6 +400,25 @@ export default function Home() {
                     </div>
                     <p className="text-xs text-blue-700">
                       Automatically removes all leads with +2xx country codes (Africa)
+                    </p>
+                  </div>
+
+                  {/* Deduplication Toggle */}
+                  <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Filter className="w-4 h-4 text-purple-600" />
+                      <label className="text-sm font-medium text-purple-900 cursor-pointer flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={enableDeduplication}
+                          onChange={(e) => setEnableDeduplication(e.target.checked)}
+                          className="w-4 h-4 rounded"
+                        />
+                        Remove Duplicate Leads
+                      </label>
+                    </div>
+                    <p className="text-xs text-purple-700">
+                      Removes duplicate leads based on phone number, email, or lead ID
                     </p>
                   </div>
 
