@@ -1,11 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Trash2, Filter } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { filterAfricanLeads, detectPhoneColumns, extractCountryCode } from "@/lib/phoneFilter";
 
 interface FileData {
   id: string;
@@ -22,11 +21,6 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [mergeProgress, setMergeProgress] = useState(0);
-  const [enableFiltering, setEnableFiltering] = useState(true);
-  const [filterStats, setFilterStats] = useState<{
-    totalRemoved: number;
-    phoneColumnsDetected: string[];
-  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -112,41 +106,18 @@ export default function Home() {
 
     setIsMerging(true);
     setMergeProgress(0);
-    setFilterStats(null);
 
     try {
       // Merge all data
       let mergedData: any[] = [];
-      let allHeaders = new Set<string>();
-      let totalFiltered = 0;
-      let phoneColumnsDetected = new Set<string>();
+      const allHeaders = new Set<string>();
 
       files.forEach((file) => {
         file.headers.forEach((h) => allHeaders.add(h));
-
-        if (enableFiltering) {
-          // Apply filtering to each file before merging
-          const { filteredData, removedCount, phoneColumnsUsed } = filterAfricanLeads(
-            file.data,
-            file.headers
-          );
-          mergedData = mergedData.concat(filteredData);
-          totalFiltered += removedCount;
-          phoneColumnsUsed.forEach((col: string) => phoneColumnsDetected.add(col));
-        } else {
-          mergedData = mergedData.concat(file.data);
-        }
+        mergedData = mergedData.concat(file.data);
       });
 
       setMergeProgress(50);
-
-      // Store filter stats
-      if (enableFiltering) {
-        setFilterStats({
-          totalRemoved: totalFiltered,
-          phoneColumnsDetected: Array.from(phoneColumnsDetected),
-        });
-      }
 
       // Create workbook
       const ws = XLSX.utils.json_to_sheet(mergedData);
@@ -163,17 +134,7 @@ export default function Home() {
       XLSX.writeFile(wb, filename);
 
       setMergeProgress(100);
-
-      const finalLeadCount = mergedData.length;
-      const originalLeadCount = files.reduce((sum, f) => sum + f.rows, 0);
-
-      if (enableFiltering && totalFiltered > 0) {
-        toast.success(
-          `Merged ${files.length} files: ${finalLeadCount} leads kept (${totalFiltered} African numbers removed)`
-        );
-      } else {
-        toast.success(`Successfully merged ${files.length} files with ${finalLeadCount} total leads`);
-      }
+      toast.success(`Successfully merged ${files.length} files with ${mergedData.length} total leads`);
 
       // Reset after a brief delay
       setTimeout(() => {
@@ -191,28 +152,6 @@ export default function Home() {
   const totalLeads = files.reduce((sum, f) => sum + f.rows, 0);
   const totalColumns = Math.max(...files.map((f) => f.columns), 0);
 
-  // Calculate estimated filtered count
-  let estimatedFiltered = 0;
-  if (enableFiltering) {
-    files.forEach((file) => {
-      const phoneColumnIndices = detectPhoneColumns(file.headers);
-      if (phoneColumnIndices.length > 0) {
-        phoneColumnIndices.forEach((colIndex) => {
-          const phoneColumn = file.headers[colIndex];
-          file.data.forEach((row) => {
-            const phone = row[phoneColumn];
-            if (phone) {
-              const { isAfrican } = extractCountryCode(String(phone));
-              if (isAfrican) {
-                estimatedFiltered++;
-              }
-            }
-          });
-        });
-      }
-    });
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-white to-gray-50">
       {/* Header */}
@@ -224,9 +163,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">TikTok Leads Merger</h1>
-              <p className="text-sm text-muted-foreground">
-                Combine and filter African leads from your exports
-              </p>
+              <p className="text-sm text-muted-foreground">Combine multiple lead exports into one file</p>
             </div>
           </div>
         </div>
@@ -344,38 +281,6 @@ export default function Home() {
                       </p>
                       <p className="text-2xl font-bold text-foreground">{totalColumns}</p>
                     </div>
-
-                    {/* Filtering Stats */}
-                    {enableFiltering && estimatedFiltered > 0 && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <p className="text-xs text-red-700 uppercase tracking-wide mb-1 font-semibold">
-                          Will Remove (North Africa)
-                        </p>
-                        <p className="text-2xl font-bold text-red-600">{estimatedFiltered}</p>
-                        <p className="text-xs text-red-600 mt-2">
-                          {totalLeads - estimatedFiltered} leads will remain
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Filter Toggle */}
-                  <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Filter className="w-4 h-4 text-blue-600" />
-                      <label className="text-sm font-medium text-blue-900 cursor-pointer flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={enableFiltering}
-                          onChange={(e) => setEnableFiltering(e.target.checked)}
-                          className="w-4 h-4 rounded"
-                        />
-                        Remove African Numbers (+2xx)
-                      </label>
-                    </div>
-                    <p className="text-xs text-blue-700">
-                      Automatically removes all leads with +2xx country codes (Africa)
-                    </p>
                   </div>
 
                   {isMerging && (
