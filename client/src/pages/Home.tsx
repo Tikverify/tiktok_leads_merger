@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { filterAfricanLeads, detectPhoneColumns, extractCountryCode } from "@/lib/phoneFilter";
 import { removeDuplicateLeads, hasIdentifyingColumns } from "@/lib/deduplication";
 import { exportAsCSV } from "@/lib/csvExport";
+import { translateColumnHeaders, hasArabicHeaders } from "@/lib/columnTranslator";
 
 interface FileData {
   id: string;
@@ -168,6 +169,20 @@ export default function Home() {
 
       setMergeProgress(65);
 
+      // Translate Arabic column headers to English
+      const allHeadersArray = Array.from(allHeaders);
+      let finalData = mergedData;
+      let finalHeaders = allHeadersArray;
+
+      if (hasArabicHeaders(allHeadersArray)) {
+        const { translatedData, translatedHeaders } = translateColumnHeaders(
+          mergedData,
+          allHeadersArray
+        );
+        finalData = translatedData;
+        finalHeaders = translatedHeaders;
+      }
+
       setMergeProgress(80);
 
       // Generate filename with timestamp
@@ -176,12 +191,11 @@ export default function Home() {
       // Export based on selected format
       if (exportFormat === "csv") {
         const filename = `tiktok_leads_merged_${timestamp}.csv`;
-        const allHeadersArray = Array.from(allHeaders);
-        exportAsCSV(mergedData, allHeadersArray, filename);
+        exportAsCSV(finalData, finalHeaders, filename);
       } else {
         // Export as XLSX
         const filename = `tiktok_leads_merged_${timestamp}.xlsx`;
-        const ws = XLSX.utils.json_to_sheet(mergedData);
+        const ws = XLSX.utils.json_to_sheet(finalData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Merged Leads");
         XLSX.writeFile(wb, filename);
