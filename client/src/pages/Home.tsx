@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { filterAfricanLeads, detectPhoneColumns, extractCountryCode } from "@/lib/phoneFilter";
 import { removeDuplicateLeads, hasIdentifyingColumns } from "@/lib/deduplication";
+import { exportAsCSV } from "@/lib/csvExport";
 
 interface FileData {
   id: string;
@@ -25,6 +26,7 @@ export default function Home() {
   const [mergeProgress, setMergeProgress] = useState(0);
   const [enableFiltering, setEnableFiltering] = useState(true);
   const [enableDeduplication, setEnableDeduplication] = useState(true);
+  const [exportFormat, setExportFormat] = useState<"xlsx" | "csv">("xlsx");
   const [filterStats, setFilterStats] = useState<{
     totalRemoved: number;
     phoneColumnsDetected: string[];
@@ -166,19 +168,24 @@ export default function Home() {
 
       setMergeProgress(65);
 
-      // Create workbook
-      const ws = XLSX.utils.json_to_sheet(mergedData);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Merged Leads");
-
       setMergeProgress(80);
 
       // Generate filename with timestamp
       const timestamp = new Date().toISOString().split("T")[0];
-      const filename = `tiktok_leads_merged_${timestamp}.xlsx`;
 
-      // Write file
-      XLSX.writeFile(wb, filename);
+      // Export based on selected format
+      if (exportFormat === "csv") {
+        const filename = `tiktok_leads_merged_${timestamp}.csv`;
+        const allHeadersArray = Array.from(allHeaders);
+        exportAsCSV(mergedData, allHeadersArray, filename);
+      } else {
+        // Export as XLSX
+        const filename = `tiktok_leads_merged_${timestamp}.xlsx`;
+        const ws = XLSX.utils.json_to_sheet(mergedData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Merged Leads");
+        XLSX.writeFile(wb, filename);
+      }
 
       setMergeProgress(100);
 
@@ -420,6 +427,37 @@ export default function Home() {
                     <p className="text-xs text-purple-700">
                       Removes duplicate leads based on phone number, email, or lead ID
                     </p>
+                  </div>
+
+                  {/* Export Format Selector */}
+                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-xs text-green-900 font-semibold mb-3 uppercase tracking-wide">
+                      Export Format
+                    </p>
+                    <div className="flex gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer flex-1">
+                        <input
+                          type="radio"
+                          name="format"
+                          value="xlsx"
+                          checked={exportFormat === "xlsx"}
+                          onChange={(e) => setExportFormat(e.target.value as "xlsx" | "csv")}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-green-900">Excel (.xlsx)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer flex-1">
+                        <input
+                          type="radio"
+                          name="format"
+                          value="csv"
+                          checked={exportFormat === "csv"}
+                          onChange={(e) => setExportFormat(e.target.value as "xlsx" | "csv")}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm text-green-900">CSV (.csv)</span>
+                      </label>
+                    </div>
                   </div>
 
                   {isMerging && (
